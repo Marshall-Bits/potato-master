@@ -1,0 +1,172 @@
+import { Player, handlePlayerInput, drawPlayer, updatePlayerDirection } from './player.js';
+import { Enemy, MiniBoss, enemies, miniBoss, spawnEnemies, addEnemy, spawnMiniBoss, setMiniBoss, updateEnemies, drawEnemies, drawMiniBoss, checkEnemyCollisions } from './enemy.js';
+import * as rockModule from './rock.js';
+import { setOnKill } from './rock.js';
+import { drawHearts, drawRockCounter, handleHitEffect, hearts, isHit, hitTimer, drawKillsCounter, drawPointsCounter } from './ui.js';
+import { GameStats } from './stats.js';
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rockModule.spawnRocks(10, canvas);
+    spawnEnemies(5, canvas);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let player = new Player(canvas.width / 2, canvas.height / 2);
+let gameState = 'menu'; // 'menu', 'playing', 'gameover'
+const stats = new GameStats();
+rockModule.setStatsObject(stats);
+
+setOnKill((type) => {
+    if (type === 'regular') {
+        stats.addRegularKill();
+        if (stats.shouldSpawnMiniBoss() && !miniBoss) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 600;
+            const x = player.x + Math.cos(angle) * dist;
+            const y = player.y + Math.sin(angle) * dist;
+            spawnMiniBoss(x, y);
+        }
+    } else if (type === 'miniboss') {
+        stats.addMiniBossKill();
+        setMiniBoss(null);
+    }
+});
+
+function resetGame() {
+    player = new Player(canvas.width / 2, canvas.height / 2);
+    hearts.value = 10;
+    rockModule.rockCount.value = 0;
+    rockModule.rocks.length = 0;
+    rockModule.groundRocks.length = 0;
+    enemies.length = 0;
+    rockModule.projectiles.length = 0;
+    stats.reset();
+    spawnEnemies(5, canvas);
+    rockModule.spawnRocks(10, canvas);
+    setMiniBoss(null);
+}
+
+function drawMenu(ctx) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(34,34,34,0.95)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('WASD Infinite Arena', canvas.width / 2, canvas.height / 2 - 60);
+    ctx.font = '28px Arial';
+    ctx.fillText('Move: WASD | Shoot: Mouse/Space', canvas.width / 2, canvas.height / 2);
+    ctx.font = '32px Arial';
+    ctx.fillText('Click to Start', canvas.width / 2, canvas.height / 2 + 80);
+    ctx.restore();
+}
+
+function drawGameOver(ctx) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(34,34,34,0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ff1744';
+    ctx.font = 'bold 56px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.font = '32px Arial';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Points: ' + stats.points, canvas.width / 2, canvas.height / 2 + 10);
+    ctx.fillText('Click to Restart', canvas.width / 2, canvas.height / 2 + 60);
+    ctx.restore();
+}
+
+const keys = {};
+document.addEventListener('keydown', (e) => {
+    if (gameState !== 'playing') return;
+    keys[e.key.toLowerCase()] = true;
+    handlePlayerInput(e, player, keys, rockModule.shootRock, canvas);
+});
+document.addEventListener('keyup', (e) => {
+    if (gameState !== 'playing') return;
+    keys[e.key.toLowerCase()] = false;
+});
+canvas.addEventListener('mousedown', (e) => {
+    if (gameState === 'menu') {
+        gameState = 'playing';
+        resetGame();
+    } else if (gameState === 'gameover') {
+        gameState = 'playing';
+        resetGame();
+    } else if (gameState === 'playing' && e.button === 0) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        rockModule.shootRock(player, mouseX, mouseY);
+    }
+});
+
+// Camera logic
+function getCameraOffset(player, canvas) {
+    return {
+        x: player.x - canvas.width / 2,
+        y: player.y - canvas.height / 2
+    };
+}
+
+// Infinite world spawn logic
+const SPAWN_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.7 + 200; // Always spawn out of view
+const SAFE_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.5 + 100; // No spawn within this radius of player
+
+function spawnEntitiesAroundPlayer(player, entities, spawnFn, maxCount, canvas) {
+    while (entities.length < maxCount) {
+        let angle = Math.random() * Math.PI * 2;
+        let dist = SAFE_RADIUS + Math.random() * (SPAWN_RADIUS - SAFE_RADIUS);
+        let x = player.x + Math.cos(angle) * dist;
+        let y = player.y + Math.sin(angle) * dist;
+        spawnFn(x, y);
+    }
+}
+
+// Update spawn logic for rocks and enemies
+function updateInfiniteSpawns(player, canvas) {
+    spawnEntitiesAroundPlayer(player, rockModule.rocks, rockModule.addRock, 15, canvas);
+    spawnEntitiesAroundPlayer(player, enemies, addEnemy, 8, canvas);
+}
+
+function update() {
+    if (gameState !== 'playing') return;
+    updatePlayerDirection(player, keys);
+    rockModule.checkRockCollection(player);
+    rockModule.updateProjectiles(canvas, player, miniBoss);
+    updateEnemies(player);
+    checkEnemyCollisions(player);
+    updateInfiniteSpawns(player, canvas);
+    if (hearts.value <= 0) {
+        gameState = 'gameover';
+    }
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (gameState === 'menu') {
+        drawMenu(ctx);
+    } else if (gameState === 'gameover') {
+        drawGameOver(ctx);
+    } else if (gameState === 'playing') {
+        const camera = getCameraOffset(player, canvas);
+        rockModule.drawRocks(ctx, camera);
+        rockModule.drawProjectiles(ctx, camera);
+        drawPlayer(ctx, player, canvas);
+        drawEnemies(ctx, camera);
+        if (miniBoss) drawMiniBoss(ctx, camera, miniBoss);
+        drawHearts(ctx);
+        drawRockCounter(ctx);
+        drawPointsCounter(ctx, stats.points);
+        handleHitEffect(ctx);
+        update();
+    }
+    requestAnimationFrame(gameLoop);
+}
+gameLoop();
