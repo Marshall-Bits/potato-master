@@ -98,12 +98,10 @@ export function updateProjectiles(canvas, player, miniBoss) {
         }
         // Bounce and damage miniboss
         if (miniBoss && handleProjectileMiniBossCollision(p, miniBoss)) {
-            projectiles.splice(i, 1);
             continue;
         }
         // Bounce and destroy regular enemies
         if (handleProjectileEnemyCollision(p, enemies)) {
-            projectiles.splice(i, 1);
             continue;
         }
         // Remove if out of range
@@ -116,10 +114,11 @@ export function updateProjectiles(canvas, player, miniBoss) {
 function handleProjectileMiniBossCollision(p, miniBoss) {
     const dist = distance(p, miniBoss);
     if (dist < (p.size + miniBoss.size) / 2) {
-        if (p.canBounce !== false) bounceProjectile(p, dist, p, miniBoss);
+        if (p.canBounce) bounceProjectile(p, dist, p, miniBoss);
         miniBoss.hp--;
         if (miniBoss.hp <= 0 && typeof onKill === 'function') onKill('miniboss');
-        return true;
+        // Do NOT remove the projectile, just bounce it
+        return false;
     }
     return false;
 }
@@ -132,7 +131,8 @@ function handleProjectileEnemyCollision(p, enemies) {
             if (p.canBounce) bounceProjectile(p, dist, p, enemy);
             enemies.splice(j, 1);
             if (typeof onKill === 'function') onKill('regular');
-            return true;
+            // Do NOT remove the projectile, just bounce it
+            return false;
         }
     }
     return false;

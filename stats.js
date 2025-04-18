@@ -19,6 +19,6 @@ export class GameStats {
         this.miniBossKills++;
     }
     shouldSpawnMiniBoss() {
-        return this.regularKills > 0 && this.regularKills % 10 === 0;
+        return this.regularKills > 0 && this.regularKills % 4 === 0;
     }
 }
