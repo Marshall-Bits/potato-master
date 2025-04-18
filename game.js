@@ -1,35 +1,42 @@
+// Clean code refactor of the main game loop and state management
 import { Player, handlePlayerInput, drawPlayer, updatePlayerDirection } from './player.js';
 import { Enemy, MiniBoss, enemies, miniBoss, spawnEnemies, addEnemy, spawnMiniBoss, setMiniBoss, updateEnemies, drawEnemies, drawMiniBoss, checkEnemyCollisions } from './enemy.js';
 import * as rockModule from './rock.js';
 import { setOnKill } from './rock.js';
-import { drawHearts, drawRockCounter, handleHitEffect, hearts, isHit, hitTimer, drawKillsCounter, drawPointsCounter } from './ui.js';
+import { drawHearts, drawRockCounter, handleHitEffect, hearts, isHit, hitTimer, drawPointsCounter } from './ui.js';
 import { GameStats } from './stats.js';
+
+// Game constants
+const INITIAL_ROCKS = 10;
+const INITIAL_ENEMIES = 5;
+const ROCKS_AROUND_PLAYER = 15;
+const ENEMIES_AROUND_PLAYER = 8;
+const MINIBOSS_SPAWN_DIST = 600;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    rockModule.spawnRocks(10, canvas);
-    spawnEnemies(5, canvas);
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
 
 let player = new Player(canvas.width / 2, canvas.height / 2);
 let gameState = 'menu'; // 'menu', 'playing', 'gameover'
 const stats = new GameStats();
 rockModule.setStatsObject(stats);
 
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rockModule.spawnRocks(INITIAL_ROCKS, canvas);
+    spawnEnemies(INITIAL_ENEMIES, canvas);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
 setOnKill((type) => {
     if (type === 'regular') {
         stats.addRegularKill();
         if (stats.shouldSpawnMiniBoss() && !miniBoss) {
             const angle = Math.random() * Math.PI * 2;
-            const dist = 600;
-            const x = player.x + Math.cos(angle) * dist;
-            const y = player.y + Math.sin(angle) * dist;
+            const x = player.x + Math.cos(angle) * MINIBOSS_SPAWN_DIST;
+            const y = player.y + Math.sin(angle) * MINIBOSS_SPAWN_DIST;
             spawnMiniBoss(x, y);
         }
     } else if (type === 'miniboss') {
@@ -47,8 +54,8 @@ function resetGame() {
     enemies.length = 0;
     rockModule.projectiles.length = 0;
     stats.reset();
-    spawnEnemies(5, canvas);
-    rockModule.spawnRocks(10, canvas);
+    spawnEnemies(INITIAL_ENEMIES, canvas);
+    rockModule.spawnRocks(INITIAL_ROCKS, canvas);
     setMiniBoss(null);
 }
 
@@ -107,7 +114,6 @@ canvas.addEventListener('mousedown', (e) => {
     }
 });
 
-// Camera logic
 function getCameraOffset(player, canvas) {
     return {
         x: player.x - canvas.width / 2,
@@ -115,11 +121,9 @@ function getCameraOffset(player, canvas) {
     };
 }
 
-// Infinite world spawn logic
-const SPAWN_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.7 + 200; // Always spawn out of view
-const SAFE_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.5 + 100; // No spawn within this radius of player
-
 function spawnEntitiesAroundPlayer(player, entities, spawnFn, maxCount, canvas) {
+    const SPAWN_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.7 + 200;
+    const SAFE_RADIUS = Math.max(window.innerWidth, window.innerHeight) * 0.5 + 100;
     while (entities.length < maxCount) {
         let angle = Math.random() * Math.PI * 2;
         let dist = SAFE_RADIUS + Math.random() * (SPAWN_RADIUS - SAFE_RADIUS);
@@ -129,10 +133,9 @@ function spawnEntitiesAroundPlayer(player, entities, spawnFn, maxCount, canvas) 
     }
 }
 
-// Update spawn logic for rocks and enemies
 function updateInfiniteSpawns(player, canvas) {
-    spawnEntitiesAroundPlayer(player, rockModule.rocks, rockModule.addRock, 15, canvas);
-    spawnEntitiesAroundPlayer(player, enemies, addEnemy, 8, canvas);
+    spawnEntitiesAroundPlayer(player, rockModule.rocks, rockModule.addRock, ROCKS_AROUND_PLAYER, canvas);
+    spawnEntitiesAroundPlayer(player, enemies, addEnemy, ENEMIES_AROUND_PLAYER, canvas);
 }
 
 function update() {

@@ -1,3 +1,4 @@
+// GameStats tracks all game-related counters and provides utility methods.
 export class GameStats {
     constructor() {
         this.points = 0;

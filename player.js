@@ -1,16 +1,20 @@
+// Constants
+const PLAYER_SIZE = 30;
+const PLAYER_COLOR = '#4caf50';
+const PLAYER_SPEED = 4;
+
 export class Player {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.size = 30;
-        this.color = '#4caf50';
-        this.speed = 4;
+        this.size = PLAYER_SIZE;
+        this.color = PLAYER_COLOR;
+        this.speed = PLAYER_SPEED;
         this.lastDirection = { x: 1, y: 0 };
     }
 }
 
 export function drawPlayer(ctx, player, canvas) {
-    // Always draw player at center of canvas
     ctx.save();
     ctx.fillStyle = player.color;
     ctx.beginPath();
@@ -21,7 +25,6 @@ export function drawPlayer(ctx, player, canvas) {
 
 export function handlePlayerInput(e, player, keys, shootRock, canvas) {
     if (e.code === 'Space') {
-        // Shoot in last direction
         shootRock(player, player.x + player.lastDirection.x * 100, player.y + player.lastDirection.y * 100);
     }
 }
