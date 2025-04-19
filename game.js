@@ -192,6 +192,12 @@ import('./enemy.js').then(({ drawEntities }) => {
             rightPad.style.touchAction = 'none';
             rightPad.style.zIndex = 20;
             container.appendChild(rightPad);
+
+            const rightPadCanvas = document.createElement('canvas');
+            rightPadCanvas.id = 'rightPadCanvas';
+            rightPadCanvas.width = 110;
+            rightPadCanvas.height = 110;
+            rightPad.appendChild(rightPadCanvas);
         }
     }
 
@@ -245,11 +251,21 @@ import('./enemy.js').then(({ drawEntities }) => {
         const rightPad = () => document.getElementById('rightPad');
         const handleRightPadTouchStart = (e) => {
             if (gameState !== 'playing') return;
-            const rect = canvas.getBoundingClientRect();
+            const pad = rightPad();
+            const rect = pad.getBoundingClientRect();
+            // Center of the right pad in screen coordinates
+            const padCenterX = rect.left + rect.width / 2;
+            const padCenterY = rect.top + rect.height / 2;
             const touch = e.touches[0];
-            const mouseX = touch.clientX - rect.left;
-            const mouseY = touch.clientY - rect.top;
-            rockModule.shootRock(player, mouseX, mouseY);
+            // Calculate angle from pad center to touch
+            const dx = touch.clientX - padCenterX;
+            const dy = touch.clientY - padCenterY;
+            const angle = Math.atan2(dy, dx);
+            // Shoot 100px in that direction from the player
+            const shootX = player.x + Math.cos(angle) * 100;
+            const shootY = player.y + Math.sin(angle) * 100;
+            rockModule.shootRock(player, shootX, shootY);
+            pad.classList.add('active');
         };
         const rpad = rightPad();
         if (rpad) {
@@ -305,19 +321,138 @@ import('./enemy.js').then(({ drawEntities }) => {
             }
         });
         // --- Shooting ---
-        rightPad.addEventListener('touchstart', (e) => {
+        rightPad.ontouchstart = null;
+        rightPad.ontouchmove = null;
+        rightPad.ontouchend = null;
+        rightPad.ontouchcancel = null;
+        rightPad.addEventListener('touchend', (e) => {
             if (gameState !== 'playing') return;
+            // Only use the first changed touch
             const touch = e.changedTouches[0];
             const rect = rightPad.getBoundingClientRect();
-            // Shoot toward the touch point relative to the center of the canvas
-            const canvasRect = canvas.getBoundingClientRect();
-            const mouseX = touch.clientX - canvasRect.left;
-            const mouseY = touch.clientY - canvasRect.top;
-            rockModule.shootRock(player, mouseX, mouseY);
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const dx = touch.clientX - centerX;
+            const dy = touch.clientY - centerY;
+            // If the touch is very close to the center, use last direction
+            const dist = Math.hypot(dx, dy);
+            let angle;
+            if (dist > 10) {
+                angle = Math.atan2(dy, dx);
+            } else {
+                angle = Math.atan2(player.lastDirection.y, player.lastDirection.x);
+            }
+            const shootX = player.x + Math.cos(angle) * 100;
+            const shootY = player.y + Math.sin(angle) * 100;
+            rockModule.shootRock(player, shootX, shootY);
             rightPad.classList.add('active');
+            setTimeout(() => rightPad.classList.remove('active'), 100);
         });
-        rightPad.addEventListener('touchend', () => {
-            rightPad.classList.remove('active');
+
+        // --- Right Pad Visual and Shooting Logic ---
+        const rightPadCanvas = document.getElementById('rightPadCanvas');
+        const ctx = rightPadCanvas.getContext('2d');
+        const PAD_SIZE = rightPadCanvas.width;
+        const CENTER = PAD_SIZE / 2;
+        const OUTER_RADIUS = PAD_SIZE / 2 - 4;
+        const INNER_RADIUS = PAD_SIZE / 5;
+        let shootTouchId = null;
+        let shootActive = false;
+        let shootPos = { x: CENTER, y: CENTER };
+
+        function drawPad(angle = null, active = false) {
+            ctx.clearRect(0, 0, PAD_SIZE, PAD_SIZE);
+            // Outer circle
+            ctx.beginPath();
+            ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
+            ctx.strokeStyle = active ? '#fff' : '#bbb';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            // Inner circle (deadzone)
+            ctx.beginPath();
+            ctx.arc(CENTER, CENTER, INNER_RADIUS, 0, Math.PI * 2);
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // Direction indicator
+            if (angle !== null && active) {
+                ctx.beginPath();
+                ctx.moveTo(CENTER, CENTER);
+                ctx.lineTo(
+                    CENTER + Math.cos(angle) * (OUTER_RADIUS - 10),
+                    CENTER + Math.sin(angle) * (OUTER_RADIUS - 10)
+                );
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+        }
+        drawPad();
+
+        rightPadCanvas.addEventListener('touchstart', (e) => {
+            if (shootTouchId !== null) return; // Only track one touch
+            const touch = e.changedTouches[0];
+            shootTouchId = touch.identifier;
+            shootActive = true;
+            const rect = rightPadCanvas.getBoundingClientRect();
+            shootPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+            const dx = shootPos.x - CENTER;
+            const dy = shootPos.y - CENTER;
+            const dist = Math.hypot(dx, dy);
+            let angle = null;
+            if (dist > INNER_RADIUS) angle = Math.atan2(dy, dx);
+            drawPad(angle, true);
+        });
+        rightPadCanvas.addEventListener('touchmove', (e) => {
+            if (!shootActive || shootTouchId === null) return;
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === shootTouchId) {
+                    const rect = rightPadCanvas.getBoundingClientRect();
+                    shootPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+                    const dx = shootPos.x - CENTER;
+                    const dy = shootPos.y - CENTER;
+                    const dist = Math.hypot(dx, dy);
+                    let angle = null;
+                    if (dist > INNER_RADIUS) angle = Math.atan2(dy, dx);
+                    drawPad(angle, true);
+                }
+            }
+        });
+        rightPadCanvas.addEventListener('touchend', (e) => {
+            if (!shootActive || shootTouchId === null) return;
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === shootTouchId) {
+                    const rect = rightPadCanvas.getBoundingClientRect();
+                    shootPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+                    const dx = shootPos.x - CENTER;
+                    const dy = shootPos.y - CENTER;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > INNER_RADIUS) {
+                        const angle = Math.atan2(dy, dx);
+                        if (gameState === 'playing') {
+                            // Calculate a point far away in the world in the angle direction
+                            // so the projectile always goes in the intended direction
+                            const shootDistance = 1000; // Large enough to go off screen
+                            const shootX = player.x + Math.cos(angle) * shootDistance;
+                            const shootY = player.y + Math.sin(angle) * shootDistance;
+                            rockModule.shootRock(player, shootX, shootY);
+                        }
+                    }
+                    shootActive = false;
+                    shootTouchId = null;
+                    drawPad();
+                }
+            }
+        });
+        rightPadCanvas.addEventListener('touchcancel', (e) => {
+            if (!shootActive || shootTouchId === null) return;
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === shootTouchId) {
+                    shootActive = false;
+                    shootTouchId = null;
+                    drawPad();
+                }
+            }
         });
     }
 

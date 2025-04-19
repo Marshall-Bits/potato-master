@@ -62,7 +62,8 @@ export function shootRock(player, mouseX, mouseY) {
     const dx = worldMouseX - player.x;
     const dy = worldMouseY - player.y;
     const dist = Math.hypot(dx, dy);
-    const dir = dist > 0 ? { x: dx / dist, y: dy / dist } : { ...player.lastDirection };
+    if (dist < 10) return; // Do not shoot if direction is too close to center
+    const dir = { x: dx / dist, y: dy / dist };
     projectiles.push({
         x: player.x,
         y: player.y,
