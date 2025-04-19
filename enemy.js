@@ -233,6 +233,14 @@ export function checkEnemyCollisions(player) {
             hearts.value = Math.max(0, hearts.value - 1);
             isHit.value = true;
             hitTimer.value = 0;
+            // Apply knockback to player
+            if (player.knockback) {
+                const knockbackStrength = 16;
+                const nx = dx / (dist || 1);
+                const ny = dy / (dist || 1);
+                player.knockback.x = nx * knockbackStrength;
+                player.knockback.y = ny * knockbackStrength;
+            }
         }
     });
 }

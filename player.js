@@ -11,6 +11,7 @@ export class Player {
         this.color = PLAYER_COLOR;
         this.speed = PLAYER_SPEED;
         this.lastDirection = { x: 1, y: 0 };
+        this.knockback = { x: 0, y: 0 }; // Add knockback vector
     }
 }
 
@@ -30,20 +31,31 @@ export function handlePlayerInput(e, player, keys, shootRock, canvas) {
 }
 
 export function updatePlayerDirection(player, keys) {
-    if (keys.w) {
-        player.y -= player.speed;
-        player.lastDirection = { x: 0, y: -1 };
+    // Apply knockback if present
+    if (player.knockback && (Math.abs(player.knockback.x) > 0.1 || Math.abs(player.knockback.y) > 0.1)) {
+        player.x += player.knockback.x;
+        player.y += player.knockback.y;
+        // Dampen knockback
+        player.knockback.x *= 0.85;
+        player.knockback.y *= 0.85;
     }
-    if (keys.s) {
-        player.y += player.speed;
-        player.lastDirection = { x: 0, y: 1 };
-    }
-    if (keys.a) {
-        player.x -= player.speed;
-        player.lastDirection = { x: -1, y: 0 };
-    }
-    if (keys.d) {
-        player.x += player.speed;
-        player.lastDirection = { x: 1, y: 0 };
+    // Only allow movement if not being strongly knocked back
+    if (Math.abs(player.knockback.x) < 2 && Math.abs(player.knockback.y) < 2) {
+        if (keys.w) {
+            player.y -= player.speed;
+            player.lastDirection = { x: 0, y: -1 };
+        }
+        if (keys.s) {
+            player.y += player.speed;
+            player.lastDirection = { x: 0, y: 1 };
+        }
+        if (keys.a) {
+            player.x -= player.speed;
+            player.lastDirection = { x: -1, y: 0 };
+        }
+        if (keys.d) {
+            player.x += player.speed;
+            player.lastDirection = { x: 1, y: 0 };
+        }
     }
 }
