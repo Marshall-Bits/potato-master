@@ -34,6 +34,14 @@ import('./enemy.js').then(({ drawEntities }) => {
         }
     });
 
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+        if (canvas.requestFullscreen) {
+            canvas.requestFullscreen();
+        } else if (canvas.webkitRequestFullscreen) { // Safari
+            canvas.webkitRequestFullscreen();
+        }
+    });
+
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
