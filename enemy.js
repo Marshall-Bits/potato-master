@@ -7,6 +7,8 @@ const MINIBOSS_SIZE = ENEMY_SIZE * 6;
 const MINIBOSS_COLOR = '#8e24aa';
 const MINIBOSS_SPEED = 1.2;
 const MINIBOSS_HP = 10;
+const MINIBOSS_PUSH_DISTANCE = 400; // Distance threshold for pushing
+const ENEMY_PUSH_OFFSET = 60; // How far from the miniboss enemies go to push
 
 export class Enemy {
     constructor(x, y) {
@@ -64,10 +66,71 @@ function getRandomEdgePosition(canvas) {
 }
 
 export function updateEnemies(player) {
-    // Move regular enemies toward player
-    enemies.forEach(enemy => moveToward(enemy, player, enemy.speed));
-    // Move miniboss toward player
-    if (miniBoss) moveToward(miniBoss, player, miniBoss.speed);
+    let pushing = false;
+    let maxPusherSpeed = 0;
+    if (miniBoss) {
+        const distToPlayer = Math.hypot(player.x - miniBoss.x, player.y - miniBoss.y);
+        pushing = distToPlayer > MINIBOSS_PUSH_DISTANCE;
+    }
+    if (miniBoss && pushing) {
+        maxPusherSpeed = Math.max(...enemies.map(e => e.speed));
+    }
+    // Calculate direction from miniboss to player
+    let bossToPlayerDir = { x: 0, y: 0 };
+    if (miniBoss && pushing) {
+        const dx = player.x - miniBoss.x;
+        const dy = player.y - miniBoss.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0) {
+            bossToPlayerDir = { x: dx / dist, y: dy / dist };
+        }
+    }
+    // Move regular enemies
+    enemies.forEach(enemy => {
+        if (miniBoss && pushing) {
+            // Calculate vector from miniboss to enemy
+            const ex = enemy.x - miniBoss.x;
+            const ey = enemy.y - miniBoss.y;
+            const enemyDist = Math.hypot(ex, ey);
+            // Calculate dot product to check if enemy is behind the miniboss (relative to player)
+            const dot = ex * -bossToPlayerDir.x + ey * -bossToPlayerDir.y;
+            // If enemy is behind the miniboss (dot > 0), move toward miniboss to push
+            if (dot > 0) {
+                // Move toward the miniboss at max speed
+                moveToward(enemy, miniBoss, maxPusherSpeed);
+            } else {
+                // Otherwise, move to a position behind the miniboss
+                const pushX = miniBoss.x - bossToPlayerDir.x * (miniBoss.size / 2 + ENEMY_PUSH_OFFSET);
+                const pushY = miniBoss.y - bossToPlayerDir.y * (miniBoss.size / 2 + ENEMY_PUSH_OFFSET);
+                moveToward(enemy, { x: pushX, y: pushY }, maxPusherSpeed);
+            }
+        } else {
+            moveToward(enemy, player, enemy.speed);
+        }
+    });
+    // All enemies colliding from behind push the miniboss
+    if (miniBoss && pushing) {
+        let pushers = 0;
+        let pushSpeedSum = 0;
+        enemies.forEach(enemy => {
+            const ex = enemy.x - miniBoss.x;
+            const ey = enemy.y - miniBoss.y;
+            const enemyDist = Math.hypot(ex, ey);
+            const minDist = (enemy.size + miniBoss.size) / 2;
+            const dot = ex * -bossToPlayerDir.x + ey * -bossToPlayerDir.y;
+            if (enemyDist <= minDist + 1e-2 && dot > 0) {
+                pushers++;
+                pushSpeedSum += enemy.speed;
+            }
+        });
+        if (pushers > 0) {
+            const avgPushSpeed = (pushSpeedSum / pushers) * 1.15;
+            miniBoss.x += bossToPlayerDir.x * avgPushSpeed;
+            miniBoss.y += bossToPlayerDir.y * avgPushSpeed;
+        }
+    } else if (miniBoss && !pushing) {
+        moveToward(miniBoss, player, miniBoss.speed);
+    }
     // Prevent overlap between enemies
     resolveCollisions(enemies);
     // Prevent overlap between enemies and miniboss
