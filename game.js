@@ -5,6 +5,15 @@ import * as rockModule from './rock.js';
 import { drawHearts, drawRockCounter, handleHitEffect, hearts, isHit, hitTimer, drawPointsCounter } from './ui.js';
 import { GameStats } from './stats.js';
 
+// Remove any old pads from previous versions (if present)
+function removeOldPads() {
+    const oldLeft = document.querySelector('body > #leftPad');
+    const oldRight = document.querySelector('body > #rightPad');
+    if (oldLeft) oldLeft.remove();
+    if (oldRight) oldRight.remove();
+}
+removeOldPads();
+
 import('./enemy.js').then(({ drawEntities }) => {
     // Game constants
     const INITIAL_ROCKS = 10;
@@ -34,13 +43,31 @@ import('./enemy.js').then(({ drawEntities }) => {
         }
     });
 
-    document.getElementById('fullscreenBtn').addEventListener('click', () => {
-        if (canvas.requestFullscreen) {
-            canvas.requestFullscreen();
-        } else if (canvas.webkitRequestFullscreen) { // Safari
-            canvas.webkitRequestFullscreen();
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    function updateFullscreenButton() {
+        if (document.fullscreenElement) {
+            fullscreenBtn.textContent = 'Exit Fullscreen';
+        } else {
+            fullscreenBtn.textContent = 'Fullscreen';
+        }
+    }
+    fullscreenBtn.addEventListener('click', () => {
+        const container = document.getElementById('gameContainer');
+        if (!document.fullscreenElement) {
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.webkitRequestFullscreen) { // Safari
+                container.webkitRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) { // Safari
+                document.webkitExitFullscreen();
+            }
         }
     });
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
 
     function resizeCanvas() {
         canvas.width = window.innerWidth;
@@ -126,6 +153,174 @@ import('./enemy.js').then(({ drawEntities }) => {
         }
     });
 
+    // --- Mobile controls logic ---
+    function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    function ensureMobilePads() {
+        if (!isMobile()) return;
+        const container = document.getElementById('gameContainer');
+        if (!document.getElementById('leftPad')) {
+            const leftPad = document.createElement('div');
+            leftPad.id = 'leftPad';
+            leftPad.style.position = 'absolute';
+            leftPad.style.left = '5%';
+            leftPad.style.bottom = '5%';
+            leftPad.style.width = '24vw';
+            leftPad.style.height = '24vw';
+            leftPad.style.maxWidth = '140px';
+            leftPad.style.maxHeight = '140px';
+            leftPad.style.background = 'rgba(255,255,255,0.08)';
+            leftPad.style.borderRadius = '50%';
+            leftPad.style.touchAction = 'none';
+            leftPad.style.zIndex = 20;
+            container.appendChild(leftPad);
+        }
+        if (!document.getElementById('rightPad')) {
+            const rightPad = document.createElement('div');
+            rightPad.id = 'rightPad';
+            rightPad.style.position = 'absolute';
+            rightPad.style.right = '5%';
+            rightPad.style.bottom = '7%';
+            rightPad.style.width = '20vw';
+            rightPad.style.height = '20vw';
+            rightPad.style.maxWidth = '110px';
+            rightPad.style.maxHeight = '110px';
+            rightPad.style.background = 'rgba(255,255,255,0.08)';
+            rightPad.style.borderRadius = '50%';
+            rightPad.style.touchAction = 'none';
+            rightPad.style.zIndex = 20;
+            container.appendChild(rightPad);
+        }
+    }
+
+    // Re-append pads on fullscreen change
+    if (typeof document !== 'undefined') {
+        document.addEventListener('fullscreenchange', ensureMobilePads);
+    }
+
+    if (isMobile()) {
+        ensureMobilePads();
+        const leftPad = () => document.getElementById('leftPad');
+        let leftPadActive = false;
+        let leftPadStart = { x: 0, y: 0 };
+        let leftPadDir = { x: 0, y: 0 };
+
+        const handleLeftPadTouchStart = (e) => {
+            leftPadActive = true;
+            const touch = e.touches[0];
+            leftPadStart = { x: touch.clientX, y: touch.clientY };
+        };
+        const handleLeftPadTouchMove = (e) => {
+            if (!leftPadActive) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - leftPadStart.x;
+            const dy = touch.clientY - leftPadStart.y;
+            // Allow diagonal movement
+            leftPadDir = { x: 0, y: 0 };
+            if (dx > 20) leftPadDir.x = 1;
+            else if (dx < -20) leftPadDir.x = -1;
+            if (dy > 20) leftPadDir.y = 1;
+            else if (dy < -20) leftPadDir.y = -1;
+            keys.w = leftPadDir.y === -1;
+            keys.s = leftPadDir.y === 1;
+            keys.a = leftPadDir.x === -1;
+            keys.d = leftPadDir.x === 1;
+        };
+        const handleLeftPadTouchEnd = () => {
+            leftPadActive = false;
+            leftPadDir = { x: 0, y: 0 };
+            keys.w = keys.a = keys.s = keys.d = false;
+        };
+        // Remove previous listeners if any
+        const pad = leftPad();
+        if (pad) {
+            pad.ontouchstart = handleLeftPadTouchStart;
+            pad.ontouchmove = handleLeftPadTouchMove;
+            pad.ontouchend = handleLeftPadTouchEnd;
+        }
+
+        // Shooting pad logic
+        const rightPad = () => document.getElementById('rightPad');
+        const handleRightPadTouchStart = (e) => {
+            if (gameState !== 'playing') return;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+            rockModule.shootRock(player, mouseX, mouseY);
+        };
+        const rpad = rightPad();
+        if (rpad) {
+            rpad.ontouchstart = handleRightPadTouchStart;
+        }
+    }
+
+    // --- Mobile analog pad logic ---
+    const leftPad = document.getElementById('leftPad');
+    const rightPad = document.getElementById('rightPad');
+
+    if (isMobile()) {
+        // --- Analog movement ---
+        let moveTouchId = null;
+        let moveCenter = { x: 0, y: 0 };
+        leftPad.addEventListener('touchstart', (e) => {
+            const touch = e.changedTouches[0];
+            moveTouchId = touch.identifier;
+            const rect = leftPad.getBoundingClientRect();
+            moveCenter = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+            leftPad.classList.add('active');
+        });
+        leftPad.addEventListener('touchmove', (e) => {
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    const dx = touch.clientX - moveCenter.x;
+                    const dy = touch.clientY - moveCenter.y;
+                    const dist = Math.hypot(dx, dy);
+                    const deadzone = 18;
+                    let x = 0, y = 0;
+                    if (dist > deadzone) {
+                        x = dx / dist;
+                        y = dy / dist;
+                    }
+                    // Analog to WASD
+                    keys.w = y < -0.5;
+                    keys.s = y > 0.5;
+                    keys.a = x < -0.5;
+                    keys.d = x > 0.5;
+                }
+            }
+        });
+        leftPad.addEventListener('touchend', (e) => {
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    keys.w = keys.a = keys.s = keys.d = false;
+                    moveTouchId = null;
+                    leftPad.classList.remove('active');
+                }
+            }
+        });
+        // --- Shooting ---
+        rightPad.addEventListener('touchstart', (e) => {
+            if (gameState !== 'playing') return;
+            const touch = e.changedTouches[0];
+            const rect = rightPad.getBoundingClientRect();
+            // Shoot toward the touch point relative to the center of the canvas
+            const canvasRect = canvas.getBoundingClientRect();
+            const mouseX = touch.clientX - canvasRect.left;
+            const mouseY = touch.clientY - canvasRect.top;
+            rockModule.shootRock(player, mouseX, mouseY);
+            rightPad.classList.add('active');
+        });
+        rightPad.addEventListener('touchend', () => {
+            rightPad.classList.remove('active');
+        });
+    }
+
     function getCameraOffset(player, canvas) {
         return {
             x: player.x - canvas.width / 2,
@@ -163,14 +358,28 @@ import('./enemy.js').then(({ drawEntities }) => {
         }
     }
 
-    function gameLoop() {
+    let lastFrameTime = performance.now();
+    let accumulator = 0;
+    const FIXED_TIMESTEP = 1000 / 60; // 60 updates per second
+
+    function gameLoop(now = performance.now()) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        accumulator += now - lastFrameTime;
+        lastFrameTime = now;
+
+        // Update logic at fixed timestep
+        while (accumulator >= FIXED_TIMESTEP) {
+            if (gameState === 'playing') {
+                update();
+            }
+            accumulator -= FIXED_TIMESTEP;
+        }
+
         if (gameState === 'menu') {
             drawMenu(ctx);
         } else if (gameState === 'gameover') {
             drawGameOver(ctx);
         } else if (gameState === 'paused') {
-            // Draw paused overlay
             const camera = getCameraOffset(player, canvas);
             rockModule.drawRocks(ctx, camera);
             rockModule.drawProjectiles(ctx, camera);
@@ -198,7 +407,6 @@ import('./enemy.js').then(({ drawEntities }) => {
             drawRockCounter(ctx);
             drawPointsCounter(ctx, stats.points);
             handleHitEffect(ctx);
-            update();
         }
         requestAnimationFrame(gameLoop);
     }

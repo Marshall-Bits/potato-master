@@ -17,11 +17,74 @@
             background: #333;
             border: 2px solid #fff;
         }
+        /* Mobile pad styles */
+        #leftPad, #rightPad {
+            position: absolute;
+            bottom: 5vw;
+            width: 24vw;
+            height: 24vw;
+            max-width: 140px;
+            max-height: 140px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+            z-index: 20;
+            touch-action: none;
+            display: none;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        #leftPad.active, #rightPad.active {
+            background: rgba(255,255,255,0.18);
+        }
+        #leftPad { left: 5vw; }
+        #rightPad { right: 5vw; }
+        @media (hover: none) and (pointer: coarse) {
+            #leftPad, #rightPad { display: block; }
+        }
     </style>
 </head>
 <body>
-<button id="fullscreenBtn" style="position:absolute;top:10px;right:10px;z-index:10;">Fullscreen</button>
-<canvas id="gameCanvas"></canvas>
+<div id="gameContainer" style="position:relative;width:100vw;height:100vh;">
+  <button id="fullscreenBtn" style="position:absolute;top:10px;right:10px;z-index:10;">Fullscreen</button>
+  <canvas id="gameCanvas"></canvas>
+  <div id="leftPad"></div>
+  <div id="rightPad"></div>
+</div>
 <script type="module" src="game.js"></script>
+<script>
+// Mobile detection
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+if (isMobile()) {
+    // Add mobile controls
+    const leftPad = document.createElement('div');
+    leftPad.id = 'leftPad';
+    leftPad.style.position = 'absolute';
+    leftPad.style.left = '30px';
+    leftPad.style.bottom = '30px';
+    leftPad.style.width = '120px';
+    leftPad.style.height = '120px';
+    leftPad.style.background = 'rgba(255,255,255,0.08)';
+    leftPad.style.borderRadius = '50%';
+    leftPad.style.touchAction = 'none';
+    leftPad.style.zIndex = 20;
+    document.body.appendChild(leftPad);
+
+    const rightPad = document.createElement('div');
+    rightPad.id = 'rightPad';
+    rightPad.style.position = 'absolute';
+    rightPad.style.right = '30px';
+    rightPad.style.bottom = '30px';
+    rightPad.style.width = '100px';
+    rightPad.style.height = '100px';
+    rightPad.style.background = 'rgba(255,255,255,0.08)';
+    rightPad.style.borderRadius = '50%';
+    rightPad.style.touchAction = 'none';
+    rightPad.style.zIndex = 20;
+    document.body.appendChild(rightPad);
+}
+</script>
 </body>
 </html>
