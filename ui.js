@@ -4,7 +4,7 @@ const ROCK_COLOR = '#bdbdbd';
 const POINTS_COLOR = '#fff';
 const HIT_FLASH_COLOR = '#ff1744';
 
-export let hearts = { value: 10 };
+export let hearts = { value: 3 };
 export let isHit = { value: false };
 export let hitTimer = { value: 0 };
 

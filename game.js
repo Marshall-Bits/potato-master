@@ -47,7 +47,7 @@ setOnKill((type) => {
 
 function resetGame() {
     player = new Player(canvas.width / 2, canvas.height / 2);
-    hearts.value = 10;
+    hearts.value = 3;
     rockModule.rockCount.value = 0;
     rockModule.rocks.length = 0;
     rockModule.groundRocks.length = 0;

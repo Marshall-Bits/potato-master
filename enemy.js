@@ -18,6 +18,7 @@ export class Enemy {
         this.color = ENEMY_COLOR;
         this.speed = ENEMY_MIN_SPEED + Math.random() * (ENEMY_MAX_SPEED - ENEMY_MIN_SPEED);
         this.type = 'regular';
+        this.strength = 1; // Regular enemy strength
     }
 }
 
@@ -31,6 +32,7 @@ export class MiniBoss {
         this.type = 'miniboss';
         this.hp = MINIBOSS_HP;
         this.maxHp = MINIBOSS_HP;
+        this.strength = 2; // MiniBoss strength
     }
 }
 
@@ -230,7 +232,8 @@ export function checkEnemyCollisions(player) {
         const dy = player.y - entity.y;
         const dist = Math.hypot(dx, dy);
         if (dist < (player.size + entity.size) / 2 && !isHit.value) {
-            hearts.value = Math.max(0, hearts.value - 1);
+            const damage = entity.strength || 1;
+            hearts.value = Math.max(0, hearts.value - damage);
             isHit.value = true;
             hitTimer.value = 0;
             // Apply knockback to player
