@@ -25,9 +25,7 @@ export function drawPlayer(ctx, player, canvas) {
 }
 
 export function handlePlayerInput(e, player, keys, shootRock, canvas) {
-    if (e.code === 'Space') {
-        shootRock(player, player.x + player.lastDirection.x * 100, player.y + player.lastDirection.y * 100);
-    }
+    // No space bar shooting here anymore
 }
 
 export function updatePlayerDirection(player, keys) {

@@ -17,7 +17,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let player = new Player(canvas.width / 2, canvas.height / 2);
-let gameState = 'menu'; // 'menu', 'playing', 'gameover'
+let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover'
 const stats = new GameStats();
 rockModule.setStatsObject(stats);
 
@@ -91,6 +91,13 @@ function drawGameOver(ctx) {
 
 const keys = {};
 document.addEventListener('keydown', (e) => {
+    if (gameState === 'playing' && e.code === 'Space') {
+        gameState = 'paused';
+        return;
+    } else if (gameState === 'paused' && e.code === 'Space') {
+        gameState = 'playing';
+        return;
+    }
     if (gameState !== 'playing') return;
     keys[e.key.toLowerCase()] = true;
     handlePlayerInput(e, player, keys, rockModule.shootRock, canvas);
@@ -157,6 +164,26 @@ function gameLoop() {
         drawMenu(ctx);
     } else if (gameState === 'gameover') {
         drawGameOver(ctx);
+    } else if (gameState === 'paused') {
+        // Draw paused overlay
+        const camera = getCameraOffset(player, canvas);
+        rockModule.drawRocks(ctx, camera);
+        rockModule.drawProjectiles(ctx, camera);
+        drawPlayer(ctx, player, canvas);
+        drawEnemies(ctx, camera);
+        if (miniBoss) drawMiniBoss(ctx, camera, miniBoss);
+        drawHearts(ctx);
+        drawRockCounter(ctx);
+        drawPointsCounter(ctx, stats.points);
+        handleHitEffect(ctx);
+        ctx.save();
+        ctx.fillStyle = 'rgba(34,34,34,0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 64px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
+        ctx.restore();
     } else if (gameState === 'playing') {
         const camera = getCameraOffset(player, canvas);
         rockModule.drawRocks(ctx, camera);
