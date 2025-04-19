@@ -24,10 +24,6 @@ export function drawPlayer(ctx, player, canvas) {
     ctx.restore();
 }
 
-export function handlePlayerInput(e, player, keys, shootRock, canvas) {
-    // No space bar shooting here anymore
-}
-
 export function updatePlayerDirection(player, keys) {
     // Apply knockback if present
     if (player.knockback && (Math.abs(player.knockback.x) > 0.1 || Math.abs(player.knockback.y) > 0.1)) {

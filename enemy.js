@@ -189,14 +189,12 @@ function resolveEnemyMiniBossCollisions(enemies, miniBoss) {
     });
 }
 
-export function drawEnemies(ctx, camera) {
+export function drawEntities(ctx, camera, miniBoss) {
     enemies.forEach(enemy => drawCircle(ctx, enemy, camera));
-}
-
-export function drawMiniBoss(ctx, camera, miniBoss) {
-    if (!miniBoss) return;
-    drawCircle(ctx, miniBoss, camera);
-    drawMiniBossHealthBar(ctx, camera, miniBoss);
+    if (miniBoss) {
+        drawCircle(ctx, miniBoss, camera);
+        drawMiniBossHealthBar(ctx, camera, miniBoss);
+    }
 }
 
 function drawCircle(ctx, entity, camera) {

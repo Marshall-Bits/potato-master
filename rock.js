@@ -11,10 +11,8 @@ export let groundRocks = [];
 export let projectiles = [];
 export let rockCount = { value: 0 };
 
-let stats = null;
 let onKill = null;
 
-export function setStatsObject(s) { stats = s; }
 export function setOnKill(cb) { onKill = cb; }
 
 export function spawnRocks(count, canvas) {
@@ -44,18 +42,15 @@ export function drawRocks(ctx, camera) {
 }
 
 export function checkRockCollection(player) {
-    collectRocks(player, rocks);
-    collectRocks(player, groundRocks);
-}
-
-function collectRocks(player, rockArray) {
-    for (let i = rockArray.length - 1; i >= 0; i--) {
-        const rock = rockArray[i];
-        if (distance(player, rock) < (player.size + rock.size) / 2) {
-            rockCount.value++;
-            rockArray.splice(i, 1);
+    [rocks, groundRocks].forEach(rockArray => {
+        for (let i = rockArray.length - 1; i >= 0; i--) {
+            const rock = rockArray[i];
+            if (Math.hypot(player.x - rock.x, player.y - rock.y) < (player.size + rock.size) / 2) {
+                rockCount.value++;
+                rockArray.splice(i, 1);
+            }
         }
-    }
+    });
 }
 
 export function shootRock(player, mouseX, mouseY) {
@@ -81,7 +76,7 @@ export function shootRock(player, mouseX, mouseY) {
     rockCount.value--;
 }
 
-import { enemies, miniBoss } from './enemy.js';
+import { enemies } from './enemy.js';
 
 export function updateProjectiles(canvas, player, miniBoss) {
     for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -112,7 +107,7 @@ export function updateProjectiles(canvas, player, miniBoss) {
 }
 
 function handleProjectileMiniBossCollision(p, miniBoss) {
-    const dist = distance(p, miniBoss);
+    const dist = Math.hypot(p.x - miniBoss.x, p.y - miniBoss.y);
     if (dist < (p.size + miniBoss.size) / 2) {
         if (p.canBounce) bounceProjectile(p, dist, p, miniBoss);
         miniBoss.hp--;
@@ -126,7 +121,7 @@ function handleProjectileMiniBossCollision(p, miniBoss) {
 function handleProjectileEnemyCollision(p, enemies) {
     for (let j = enemies.length - 1; j >= 0; j--) {
         const enemy = enemies[j];
-        const dist = distance(p, enemy);
+        const dist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
         if (dist < (p.size + enemy.size) / 2) {
             if (p.canBounce) bounceProjectile(p, dist, p, enemy);
             enemies.splice(j, 1);
@@ -146,10 +141,6 @@ function bounceProjectile(p, dist, from, to) {
     p.vx = (p.vx - 2 * dot * norm.x) * PROJECTILE_BOUNCE_MULTIPLIER;
     p.vy = (p.vy - 2 * dot * norm.y) * PROJECTILE_BOUNCE_MULTIPLIER;
     p.canBounce = false;
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 export function drawProjectiles(ctx, camera) {
