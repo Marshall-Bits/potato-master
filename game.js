@@ -249,39 +249,25 @@ import('./enemy.js').then(({ drawEntities }) => {
 
         // Shooting pad logic
         const rightPad = () => document.getElementById('rightPad');
-        const handleRightPadTouchStart = (e) => {
-            if (gameState !== 'playing') return;
-            const pad = rightPad();
-            const rect = pad.getBoundingClientRect();
-            // Center of the right pad in screen coordinates
-            const padCenterX = rect.left + rect.width / 2;
-            const padCenterY = rect.top + rect.height / 2;
-            const touch = e.touches[0];
-            // Calculate angle from pad center to touch
-            const dx = touch.clientX - padCenterX;
-            const dy = touch.clientY - padCenterY;
-            const angle = Math.atan2(dy, dx);
-            // Shoot 100px in that direction from the player
-            const shootX = player.x + Math.cos(angle) * 100;
-            const shootY = player.y + Math.sin(angle) * 100;
-            rockModule.shootRock(player, shootX, shootY);
-            pad.classList.add('active');
-        };
-        const rpad = rightPad();
-        if (rpad) {
-            rpad.ontouchstart = handleRightPadTouchStart;
-        }
+        // Remove legacy rightPad touchend handler to prevent double shooting and tap-to-shoot on mobile
+        rightPad.ontouchstart = null;
+        rightPad.ontouchmove = null;
+        rightPad.ontouchend = null;
+        rightPad.ontouchcancel = null;
     }
 
     // --- Mobile analog pad logic ---
     const leftPad = document.getElementById('leftPad');
     const rightPad = document.getElementById('rightPad');
+    const rightPadCanvas = document.getElementById('rightPadCanvas');
 
     if (isMobile()) {
-        // --- Analog movement ---
+        // --- Left Pad: Movement ---
         let moveTouchId = null;
         let moveCenter = { x: 0, y: 0 };
         leftPad.addEventListener('touchstart', (e) => {
+            // Only track the first touch for left pad
+            if (moveTouchId !== null) return;
             const touch = e.changedTouches[0];
             moveTouchId = touch.identifier;
             const rect = leftPad.getBoundingClientRect();
@@ -303,7 +289,6 @@ import('./enemy.js').then(({ drawEntities }) => {
                         x = dx / dist;
                         y = dy / dist;
                     }
-                    // Analog to WASD
                     keys.w = y < -0.5;
                     keys.s = y > 0.5;
                     keys.a = x < -0.5;
@@ -320,61 +305,39 @@ import('./enemy.js').then(({ drawEntities }) => {
                 }
             }
         });
-        // --- Shooting ---
-        rightPad.ontouchstart = null;
-        rightPad.ontouchmove = null;
-        rightPad.ontouchend = null;
-        rightPad.ontouchcancel = null;
-        rightPad.addEventListener('touchend', (e) => {
-            if (gameState !== 'playing') return;
-            // Only use the first changed touch
-            const touch = e.changedTouches[0];
-            const rect = rightPad.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            const dx = touch.clientX - centerX;
-            const dy = touch.clientY - centerY;
-            // If the touch is very close to the center, use last direction
-            const dist = Math.hypot(dx, dy);
-            let angle;
-            if (dist > 10) {
-                angle = Math.atan2(dy, dx);
-            } else {
-                angle = Math.atan2(player.lastDirection.y, player.lastDirection.x);
+        leftPad.addEventListener('touchcancel', (e) => {
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    keys.w = keys.a = keys.s = keys.d = false;
+                    moveTouchId = null;
+                    leftPad.classList.remove('active');
+                }
             }
-            const shootX = player.x + Math.cos(angle) * 100;
-            const shootY = player.y + Math.sin(angle) * 100;
-            rockModule.shootRock(player, shootX, shootY);
-            rightPad.classList.add('active');
-            setTimeout(() => rightPad.classList.remove('active'), 100);
         });
 
-        // --- Right Pad Visual and Shooting Logic ---
-        const rightPadCanvas = document.getElementById('rightPadCanvas');
+        // --- Right Pad: Shooting ---
+        let shootTouchId = null;
+        let shootActive = false;
+        let shootPos = null;
+        let shootAngle = null;
         const ctx = rightPadCanvas.getContext('2d');
         const PAD_SIZE = rightPadCanvas.width;
         const CENTER = PAD_SIZE / 2;
         const OUTER_RADIUS = PAD_SIZE / 2 - 4;
         const INNER_RADIUS = PAD_SIZE / 5;
-        let shootTouchId = null;
-        let shootActive = false;
-        let shootPos = { x: CENTER, y: CENTER };
 
         function drawPad(angle = null, active = false) {
             ctx.clearRect(0, 0, PAD_SIZE, PAD_SIZE);
-            // Outer circle
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
             ctx.strokeStyle = active ? '#fff' : '#bbb';
             ctx.lineWidth = 3;
             ctx.stroke();
-            // Inner circle (deadzone)
             ctx.beginPath();
             ctx.arc(CENTER, CENTER, INNER_RADIUS, 0, Math.PI * 2);
             ctx.strokeStyle = '#888';
             ctx.lineWidth = 2;
             ctx.stroke();
-            // Direction indicator
             if (angle !== null && active) {
                 ctx.beginPath();
                 ctx.moveTo(CENTER, CENTER);
@@ -390,7 +353,9 @@ import('./enemy.js').then(({ drawEntities }) => {
         drawPad();
 
         rightPadCanvas.addEventListener('touchstart', (e) => {
-            if (shootTouchId !== null) return; // Only track one touch
+            e.preventDefault();
+            // Only track the first touch for right pad
+            if (shootTouchId !== null) return;
             const touch = e.changedTouches[0];
             shootTouchId = touch.identifier;
             shootActive = true;
@@ -399,11 +364,11 @@ import('./enemy.js').then(({ drawEntities }) => {
             const dx = shootPos.x - CENTER;
             const dy = shootPos.y - CENTER;
             const dist = Math.hypot(dx, dy);
-            let angle = null;
-            if (dist > INNER_RADIUS) angle = Math.atan2(dy, dx);
-            drawPad(angle, true);
-        });
+            shootAngle = (dist > INNER_RADIUS) ? Math.atan2(dy, dx) : null;
+            drawPad(shootAngle, true);
+        }, { passive: false });
         rightPadCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
             if (!shootActive || shootTouchId === null) return;
             for (let touch of e.changedTouches) {
                 if (touch.identifier === shootTouchId) {
@@ -412,13 +377,13 @@ import('./enemy.js').then(({ drawEntities }) => {
                     const dx = shootPos.x - CENTER;
                     const dy = shootPos.y - CENTER;
                     const dist = Math.hypot(dx, dy);
-                    let angle = null;
-                    if (dist > INNER_RADIUS) angle = Math.atan2(dy, dx);
-                    drawPad(angle, true);
+                    shootAngle = (dist > INNER_RADIUS) ? Math.atan2(dy, dx) : null;
+                    drawPad(shootAngle, true);
                 }
             }
-        });
+        }, { passive: false });
         rightPadCanvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
             if (!shootActive || shootTouchId === null) return;
             for (let touch of e.changedTouches) {
                 if (touch.identifier === shootTouchId) {
@@ -427,33 +392,40 @@ import('./enemy.js').then(({ drawEntities }) => {
                     const dx = shootPos.x - CENTER;
                     const dy = shootPos.y - CENTER;
                     const dist = Math.hypot(dx, dy);
-                    if (dist > INNER_RADIUS) {
-                        const angle = Math.atan2(dy, dx);
-                        if (gameState === 'playing') {
-                            // Calculate a point far away in the world in the angle direction
-                            // so the projectile always goes in the intended direction
-                            const shootDistance = 1000; // Large enough to go off screen
-                            const shootX = player.x + Math.cos(angle) * shootDistance;
-                            const shootY = player.y + Math.sin(angle) * shootDistance;
-                            rockModule.shootRock(player, shootX, shootY);
-                        }
+                    shootAngle = (dist > INNER_RADIUS) ? Math.atan2(dy, dx) : null;
+                    if (shootAngle !== null && gameState === 'playing') {
+                        const shootDistance = 1000;
+                        const shootX = player.x + Math.cos(shootAngle) * shootDistance;
+                        const shootY = player.y + Math.sin(shootAngle) * shootDistance;
+                        rockModule.shootRock(player, shootX, shootY);
                     }
                     shootActive = false;
                     shootTouchId = null;
+                    shootAngle = null;
                     drawPad();
                 }
             }
-        });
+        }, { passive: false });
         rightPadCanvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
             if (!shootActive || shootTouchId === null) return;
             for (let touch of e.changedTouches) {
                 if (touch.identifier === shootTouchId) {
                     shootActive = false;
                     shootTouchId = null;
+                    shootAngle = null;
                     drawPad();
                 }
             }
-        });
+        }, { passive: false });
+
+        // Remove all mouse events from rightPadCanvas and rightPad on mobile
+        rightPadCanvas.onmousedown = null;
+        rightPadCanvas.onmouseup = null;
+        rightPadCanvas.onclick = null;
+        rightPad.onmousedown = null;
+        rightPad.onmouseup = null;
+        rightPad.onclick = null;
     }
 
     function getCameraOffset(player, canvas) {
